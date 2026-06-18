@@ -1,0 +1,15 @@
+backend/.env
+backend/.venv/
+backend/*.log
+backend/meeting_reports.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/reports/*
+!backend/reports/.gitkeep
+backend/__pycache__/
+backend/app/**/__pycache__/
+frontend/node_modules/
+frontend/dist/
+frontend/*.log
+frontend/.env
+.DS_Store
