@@ -9,10 +9,14 @@ from app.config import get_settings
 
 
 def split_audio_into_chunks(audio_path: Path, work_dir: Path) -> list[Path]:
-    settings = get_settings()
-    if audio_path.stat().st_size <= settings.openai_stt_max_bytes:
-        return [audio_path]
+    """Normalize every upload to mp3 chunks before sending it to STT.
 
+    Some recorder-produced .m4a files have a valid extension but a container or
+    codec layout that OpenAI rejects as "Invalid file format". Transcoding also
+    gives every request an ASCII .mp3 filename and keeps large-file chunking in
+    the same path.
+    """
+    settings = get_settings()
     ffmpeg_executable = _resolve_ffmpeg(settings.ffmpeg_path)
     return _create_stt_chunks(audio_path, work_dir, ffmpeg_executable)
 
@@ -57,7 +61,10 @@ def transcribe_with_openai(audio_path: Path) -> str:
                     f"STT chunk 처리 실패 ({index}/{len(chunks)}, {chunk_path.name}): {exc}"
                 ) from exc
 
-    return "\n\n".join(part.strip() for part in transcripts if part and part.strip()).strip()
+    transcript = "\n\n".join(part.strip() for part in transcripts if part and part.strip()).strip()
+    if not transcript:
+        raise RuntimeError("STT 결과 transcript가 비어 있습니다.")
+    return transcript
 
 
 def transcribe_with_local_whisper(audio_path: Path) -> str:
@@ -93,9 +100,9 @@ def _resolve_ffmpeg(ffmpeg_path: str) -> str:
         pass
 
     raise RuntimeError(
-        "25MB를 초과하는 음성파일은 STT 호출 전에 chunk 분할이 필요합니다. "
+        "STT 전처리를 위해 ffmpeg가 필요합니다. "
         "pip install -r requirements.txt를 다시 실행하거나, ffmpeg를 설치해 PATH에 추가하거나, "
-        "backend/.env의 FFMPEG_PATH에 ffmpeg.exe 경로를 설정하세요."
+        "backend/.env에 FFMPEG_PATH로 ffmpeg.exe 경로를 설정하세요."
     )
 
 
@@ -141,7 +148,7 @@ def _create_stt_chunks(audio_path: Path, work_dir: Path, ffmpeg_executable: str)
         )
         if completed.returncode != 0:
             details = (completed.stderr or completed.stdout or "").strip()
-            raise RuntimeError(f"ffmpeg 오디오 chunk 분할 실패: {details}")
+            raise RuntimeError(f"ffmpeg 오디오 전처리 실패: {details}")
 
         chunks = sorted(work_dir.glob("chunk_*.mp3"))
         if chunks and all(chunk.stat().st_size <= settings.openai_stt_max_bytes for chunk in chunks):
@@ -149,7 +156,7 @@ def _create_stt_chunks(audio_path: Path, work_dir: Path, ffmpeg_executable: str)
 
     raise RuntimeError(
         "STT chunk 파일이 OpenAI 업로드 제한보다 큽니다. "
-        "STT_CHUNK_SECONDS 값을 더 낮추거나 입력 파일을 더 작은 단위로 나눠서 업로드하세요."
+        "STT_CHUNK_SECONDS 값을 더 낮추거나 입력 파일을 더 작은 단위로 나누어 업로드하세요."
     )
 
 

@@ -18,11 +18,16 @@ async function request(path, options = {}) {
 export async function uploadMeeting(formValues) {
   const body = new FormData();
   body.append("audio_file", formValues.audioFile);
+  if (formValues.imageFiles?.length) {
+    formValues.imageFiles.forEach((file) => body.append("image_files", file));
+  }
   body.append("title", formValues.title);
   body.append("meeting_date", formValues.meetingDate);
   body.append("participants", formValues.participants);
   body.append("project_name", formValues.projectName);
   body.append("meeting_type", formValues.meetingType);
+  body.append("report_type", formValues.reportType || "meeting");
+  body.append("custom_prompt", formValues.customPrompt || "");
 
   return request("/api/meetings/upload", {
     method: "POST",
@@ -42,6 +47,16 @@ export async function getMeeting(meetingId) {
 
 export async function getMeetings() {
   return request("/api/meetings");
+}
+
+export async function updateMeetingReport(meetingId, reportMarkdown) {
+  return request(`/api/meetings/${meetingId}/report`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ report_markdown: reportMarkdown }),
+  });
 }
 
 export function markdownDownloadUrl(meetingId) {

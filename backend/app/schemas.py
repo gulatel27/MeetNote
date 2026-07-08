@@ -15,6 +15,10 @@ class ProcessResponse(BaseModel):
     report: str | None = None
 
 
+class ReportUpdateRequest(BaseModel):
+    report_markdown: str
+
+
 class MeetingListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -24,6 +28,8 @@ class MeetingListItem(BaseModel):
     participants: str
     project_name: str | None
     meeting_type: str
+    report_type: str = "meeting"
+    custom_prompt: str | None = None
     status: str
     error_message: str | None
     created_at: datetime
@@ -31,6 +37,8 @@ class MeetingListItem(BaseModel):
 
 
 class MeetingDetail(MeetingListItem):
+    image_file_paths: list[str] | None = None
+    image_context: str | None = None
     transcript: str | None = None
     summary_json: dict[str, Any] | None = None
     report_markdown: str | None = None

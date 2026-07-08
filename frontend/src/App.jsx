@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 
 import HistoryPage from "./pages/HistoryPage.jsx";
+import HomePage from "./pages/HomePage.jsx";
+import InternalSummaryPage from "./pages/InternalSummaryPage.jsx";
 import MeetingResultPage from "./pages/MeetingResultPage.jsx";
+import SeminarUploadPage from "./pages/SeminarUploadPage.jsx";
 import UploadPage from "./pages/UploadPage.jsx";
 
 function getRoute() {
@@ -22,9 +25,15 @@ export default function App() {
     setRoute(path);
   };
 
-  let page = <UploadPage navigate={navigate} />;
+  let page = <HomePage navigate={navigate} />;
   const meetingMatch = route.match(/^\/meetings\/(\d+)$/);
-  if (route === "/history") {
+  if (route === "/meeting-report") {
+    page = <UploadPage navigate={navigate} />;
+  } else if (route === "/seminar-summary") {
+    page = <SeminarUploadPage navigate={navigate} />;
+  } else if (route === "/internal-summary") {
+    page = <InternalSummaryPage navigate={navigate} />;
+  } else if (route === "/history") {
     page = <HistoryPage navigate={navigate} />;
   } else if (meetingMatch) {
     page = <MeetingResultPage meetingId={meetingMatch[1]} />;
@@ -34,11 +43,11 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <button className="brand" onClick={() => navigate("/")} type="button">
-          회의 보고서 자동화
+          MeetNote
         </button>
         <nav>
           <button onClick={() => navigate("/")} type="button">
-            업로드
+            홈
           </button>
           <button onClick={() => navigate("/history")} type="button">
             히스토리
