@@ -8,8 +8,11 @@ NO_VALUE = "미정"
 
 
 def generate_report_markdown(meeting: Meeting, summary: dict[str, Any], transcript: str) -> str:
-    if getattr(meeting, "report_type", "meeting") == "seminar":
+    report_type = getattr(meeting, "report_type", "meeting")
+    if report_type == "seminar":
         return generate_seminar_report_markdown(meeting, summary, transcript)
+    if report_type == "interview":
+        return generate_interview_report_markdown(meeting, summary, transcript)
 
     action_items = summary.get("action_items") or []
     follow_up = summary.get("follow_up") or {}
@@ -143,6 +146,68 @@ def generate_seminar_report_markdown(meeting: Meeting, summary: dict[str, Any], 
             _format_bullets(summary.get("audience_key_points"), split_sentences=True),
             "",
             "## 5. 원문 Transcript",
+            "",
+            transcript.strip() or "Transcript가 없음.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def generate_interview_report_markdown(meeting: Meeting, summary: dict[str, Any], transcript: str) -> str:
+    lines = [
+        "# 면접 평가서",
+        "",
+        "## 1. 면접 기본 정보",
+        "",
+        "| 항목 | 내용 |",
+        "| -- | -- |",
+        f"| 면접 제목 | {_escape_table(meeting.title)} |",
+        f"| 면접 일자 | {_escape_table(meeting.meeting_date)} |",
+        f"| 지원 포지션 | {_escape_table(meeting.project_name or NO_VALUE)} |",
+        f"| 지원자/면접관 | {_escape_table(meeting.participants or NO_VALUE)} |",
+        f"| 작성 방식 | 녹취 transcript 기반 AI 초안. 면접관 검토 후 수정하여 사용 |",
+        "",
+    ]
+
+    # 대분류별로 묶되, 질문지 순서를 유지한다.
+    grouped: list[tuple[str, list[dict[str, Any]]]] = []
+    for entry in summary.get("evaluations") or []:
+        category = (entry.get("category") or "").strip() or "평가 항목"
+        if grouped and grouped[-1][0] == category:
+            grouped[-1][1].append(entry)
+        else:
+            grouped.append((category, [entry]))
+
+    section_no = 2
+    if not grouped:
+        lines.extend([f"## {section_no}. 항목별 평가 의견", "", f"* {NO_VALUE}", ""])
+        section_no += 1
+
+    for category, entries in grouped:
+        lines.extend([f"## {section_no}. {category}", ""])
+        section_no += 1
+        for entry in entries:
+            lines.extend([f"### [{entry.get('item') or '평가 항목'}]", ""])
+            if entry.get("question"):
+                lines.extend([f"Q. {entry['question']}", ""])
+            lines.extend([entry.get("opinion") or NO_VALUE, ""])
+            evidence = _as_list(entry.get("evidence"))
+            if evidence:
+                lines.extend([f"* 근거: {item}" for item in evidence])
+                lines.append("")
+
+    lines.extend(
+        [
+            f"## {section_no}. 종합의견",
+            "",
+            _format_bullets(summary.get("overall_opinion"), split_sentences=True),
+            "",
+            f"## {section_no + 1}. 추가 확인 필요사항",
+            "",
+            _format_bullets(summary.get("follow_up_checks")),
+            "",
+            f"## {section_no + 2}. 원문 Transcript",
             "",
             transcript.strip() or "Transcript가 없음.",
             "",

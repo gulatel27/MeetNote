@@ -348,3 +348,136 @@ def normalize_seminar_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "content_summary": _normalize_list(summary.get("content_summary"), split_sentences=True),
         "audience_key_points": _normalize_list(summary.get("audience_key_points"), split_sentences=True),
     }
+
+
+INTERVIEW_NOT_CONFIRMED = "면접 중 확인되지 않음"
+
+INTERVIEW_SYSTEM_PROMPT = f"""
+너는 채용 면접 녹취를 읽고 면접관을 대신해 면접 평가서 초안을 작성하는 전문 AI 어시스턴트다.
+사용자가 제공한 평가 질문지의 각 항목에 대해, transcript에 근거한 평가 의견을 작성한다.
+
+작성 원칙:
+- transcript에는 화자 구분이 없다. 질문하는 쪽은 면접관, 답변하는 쪽은 지원자로 문맥에 따라 구분한다.
+- 각 평가 의견은 지원자의 실제 발언(경험, 사례, 수치, 기술명, 회사명, 프로젝트명)을 근거로 구체적으로 작성한다.
+- transcript에 근거가 없는 항목은 추측하지 않고 "{INTERVIEW_NOT_CONFIRMED}"으로 쓰고, 추가 확인이 필요한 내용을 적는다.
+- 인성, 성향, 정직성처럼 판단이 어려운 항목은 발언 태도와 답변 내용에서 관찰된 사실만 근거로 쓰고, 단정하지 않는다.
+- 나이, 성별, 출신지, 가족관계, 종교, 건강 등 직무와 무관한 개인정보는 평가 근거로 쓰지 않는다.
+- 질문지의 항목 순서와 문구를 그대로 유지한다. 항목을 빼거나 새로 만들지 않는다.
+- 문체는 "했습니다/합니다/입니다" 대신 "확인함", "보유함", "필요", "판단됨" 같은 평가서 보고체로 끝낸다.
+- 반드시 JSON만 출력하고 Markdown 코드블록이나 설명 문장을 포함하지 않는다.
+""".strip()
+
+
+def build_interview_prompt(meeting: Meeting, transcript: str) -> str:
+    questionnaire = (meeting.custom_prompt or "").strip()
+    return f"""
+다음 면접 정보와 평가 질문지를 바탕으로 한국어 면접 평가서 JSON을 생성해줘.
+
+[면접 기본 정보]
+- 면접 제목: {meeting.title}
+- 면접 일자: {meeting.meeting_date}
+- 지원 포지션: {meeting.project_name or "미정"}
+- 지원자/면접관: {meeting.participants or "미정"}
+
+[평가 질문지]
+{questionnaire}
+
+[출력 JSON 스키마]
+{{
+  "evaluations": [
+    {{
+      "category": "질문지의 대분류 (예: Job & Competency (경력/직무역량))",
+      "item": "평가 항목명 (예: 지원 동기/이직 사유)",
+      "question": "질문지의 평가 질문 원문",
+      "opinion": "평가 의견. 3~6문장 분량으로 상세히. 근거가 없으면 '{INTERVIEW_NOT_CONFIRMED}'과 추가 확인 필요사항",
+      "evidence": ["의견의 근거가 된 지원자 발언 요지. 1~3개. 근거가 없으면 빈 배열"]
+    }}
+  ],
+  "overall_opinion": [
+    "면접자에 대한 종합의견. 4~8개 bullet. 강점, 우려사항, 채용 시 고려사항 포함"
+  ],
+  "follow_up_checks": [
+    "레퍼런스 체크나 추가 면접에서 확인이 필요한 사항"
+  ]
+}}
+
+질문지에 '종합의견' 항목이 있으면 evaluations가 아니라 overall_opinion에 작성한다.
+
+[Transcript]
+{transcript}
+""".strip()
+
+
+def generate_interview_evaluation(meeting: Meeting, transcript: str) -> dict[str, Any]:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY가 설정되지 않았습니다.")
+    if not transcript.strip():
+        raise ValueError("평가할 transcript가 비어 있습니다.")
+    if not (meeting.custom_prompt or "").strip():
+        raise ValueError("면접 평가 질문지가 비어 있습니다.")
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.responses.create(
+        model=settings.openai_summary_model,
+        instructions=INTERVIEW_SYSTEM_PROMPT,
+        input=build_interview_prompt(meeting, transcript),
+    )
+    output_text = getattr(response, "output_text", None)
+    if not output_text:
+        output_text = str(response)
+
+    return parse_interview_json(output_text)
+
+
+def parse_interview_json(raw_text: str) -> dict[str, Any]:
+    cleaned = raw_text.strip()
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", cleaned, flags=re.DOTALL | re.IGNORECASE)
+    if fenced:
+        cleaned = fenced.group(1).strip()
+
+    candidates = [cleaned]
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start >= 0 and end > start:
+        candidates.append(cleaned[start : end + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return normalize_interview_evaluation(parsed)
+
+    return normalize_interview_evaluation(
+        {
+            "evaluations": [],
+            "overall_opinion": [cleaned],
+            "follow_up_checks": ["LLM 응답을 JSON으로 파싱하지 못함. 응답 형식 확인 필요"],
+        }
+    )
+
+
+def normalize_interview_evaluation(summary: dict[str, Any]) -> dict[str, Any]:
+    evaluations = []
+    raw_evaluations = summary.get("evaluations")
+    if isinstance(raw_evaluations, list):
+        for entry in raw_evaluations:
+            if not isinstance(entry, dict):
+                continue
+            evaluations.append(
+                {
+                    "category": str(entry.get("category") or "").strip(),
+                    "item": str(entry.get("item") or "").strip() or "평가 항목",
+                    "question": str(entry.get("question") or "").strip(),
+                    "opinion": str(entry.get("opinion") or "").strip() or INTERVIEW_NOT_CONFIRMED,
+                    "evidence": _normalize_list(entry.get("evidence")),
+                }
+            )
+
+    return {
+        "evaluations": evaluations,
+        "overall_opinion": _normalize_list(summary.get("overall_opinion"), split_sentences=True),
+        "follow_up_checks": _normalize_list(summary.get("follow_up_checks")),
+    }

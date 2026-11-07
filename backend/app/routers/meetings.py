@@ -10,7 +10,11 @@ from app.services.file_service import sanitize_filename, save_audio_upload, save
 from app.services.image_service import extract_image_context
 from app.services.report_service import generate_report_markdown
 from app.services.stt_service import transcribe_audio
-from app.services.summary_service import generate_meeting_summary, generate_seminar_summary
+from app.services.summary_service import (
+    generate_interview_evaluation,
+    generate_meeting_summary,
+    generate_seminar_summary,
+)
 
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
@@ -30,10 +34,15 @@ async def upload_meeting(
     db: Session = Depends(get_db),
 ) -> UploadResponse:
     normalized_report_type = report_type.strip().lower() or "meeting"
-    if normalized_report_type not in {"meeting", "seminar", "internal"}:
+    if normalized_report_type not in {"meeting", "seminar", "internal", "interview"}:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="지원하지 않는 보고서 유형입니다.",
+        )
+    if normalized_report_type == "interview" and not custom_prompt.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="면접 평가 질문지를 입력하세요.",
         )
 
     audio_path = await save_audio_upload(audio_file)
@@ -77,6 +86,8 @@ def process_meeting(meeting_id: int, db: Session = Depends(get_db)) -> ProcessRe
 
         if meeting.report_type == "seminar":
             summary = generate_seminar_summary(meeting, transcript)
+        elif meeting.report_type == "interview":
+            summary = generate_interview_evaluation(meeting, transcript)
         else:
             summary = generate_meeting_summary(meeting, transcript)
         report = generate_report_markdown(meeting, summary, transcript)

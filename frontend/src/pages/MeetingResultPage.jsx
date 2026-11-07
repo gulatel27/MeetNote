@@ -101,6 +101,7 @@ export default function MeetingResultPage({ meetingId }) {
 
   const shownMarkdown = isEditing ? draftMarkdown : meeting.report_markdown;
   const isSeminar = meeting.report_type === "seminar";
+  const isInterview = meeting.report_type === "interview";
 
   return (
     <section className="result-layout">
@@ -108,8 +109,8 @@ export default function MeetingResultPage({ meetingId }) {
         <div>
           <h1>{meeting.title}</h1>
           <p className="meta">
-            {meeting.meeting_date} · {isSeminar ? "세미나 요약" : meeting.meeting_type} ·{" "}
-            {meeting.project_name || "프로젝트/주제 미정"}
+            {meeting.meeting_date} · {isSeminar ? "세미나 요약" : isInterview ? "면접 평가" : meeting.meeting_type} ·{" "}
+            {meeting.project_name || (isInterview ? "지원 포지션 미정" : "프로젝트/주제 미정")}
           </p>
         </div>
         <StatusBadge status={meeting.status} />

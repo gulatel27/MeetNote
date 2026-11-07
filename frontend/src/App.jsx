@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import HistoryPage from "./pages/HistoryPage.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import InternalSummaryPage from "./pages/InternalSummaryPage.jsx";
+import InterviewUploadPage from "./pages/InterviewUploadPage.jsx";
 import MeetingResultPage from "./pages/MeetingResultPage.jsx";
 import SeminarUploadPage from "./pages/SeminarUploadPage.jsx";
 import UploadPage from "./pages/UploadPage.jsx";
@@ -33,6 +34,8 @@ export default function App() {
     page = <SeminarUploadPage navigate={navigate} />;
   } else if (route === "/internal-summary") {
     page = <InternalSummaryPage navigate={navigate} />;
+  } else if (route === "/interview-evaluation") {
+    page = <InterviewUploadPage navigate={navigate} />;
   } else if (route === "/history") {
     page = <HistoryPage navigate={navigate} />;
   } else if (meetingMatch) {

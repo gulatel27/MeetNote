@@ -19,6 +19,11 @@ const HISTORY_MODULES = [
     title: "내부회의요약",
     description: "내부회의 전용 요약 이력",
   },
+  {
+    key: "interview",
+    title: "면접평가",
+    description: "면접 녹음 기반 평가서 생성 이력",
+  },
 ];
 
 function rowsForModule(meetings, moduleKey) {

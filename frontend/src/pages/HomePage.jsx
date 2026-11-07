@@ -17,6 +17,12 @@ const OPTIONS = [
     path: "/internal-summary",
     icon: "🏢",
   },
+  {
+    title: "면접 평가",
+    description: "면접 녹음을 평가 질문지 항목별 의견과 종합의견으로 정리한 면접 평가서 초안을 생성합니다.",
+    path: "/interview-evaluation",
+    icon: "🧑‍💼",
+  },
 ];
 
 export default function HomePage({ navigate }) {
