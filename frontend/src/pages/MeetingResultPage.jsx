@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getMeeting, markdownDownloadUrl, processMeeting, updateMeetingReport } from "../api/client.js";
 import MarkdownReport from "../components/MarkdownReport.jsx";
+import RecordingQuestions from "../components/RecordingQuestions.jsx";
 import StatusBadge, { StatusSteps } from "../components/StatusBadge.jsx";
 
 export default function MeetingResultPage({ meetingId }) {
@@ -163,6 +164,8 @@ export default function MeetingResultPage({ meetingId }) {
       {isEditing ? (
         <p className="edit-hint">오탈자나 표현을 수정한 뒤 저장하면 다운로드되는 Markdown에도 반영됩니다.</p>
       ) : null}
+
+      <RecordingQuestions key={meeting.id} meetingId={meeting.id} hasTranscript={Boolean(meeting.transcript?.trim())} isProcessing={isProcessing} />
 
       <div className="content-grid">
         <article className="report-card">

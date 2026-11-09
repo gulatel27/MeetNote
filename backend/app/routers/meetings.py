@@ -1,13 +1,15 @@
 import json
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from openai import APITimeoutError, OpenAIError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Meeting, MeetingStatus
-from app.schemas import MeetingDetail, MeetingListItem, ProcessResponse, ReportUpdateRequest, UploadResponse
+from app.schemas import MeetingDetail, MeetingListItem, ProcessResponse, QuestionAnswer, QuestionRequest, ReportUpdateRequest, UploadResponse
 from app.services.file_service import sanitize_filename, save_audio_upload, save_image_uploads, save_report_markdown
 from app.services.image_service import extract_image_context
+from app.services.question_service import answer_question
 from app.services.report_service import generate_report_markdown
 from app.services.stt_service import transcribe_audio
 from app.services.summary_service import (
@@ -18,6 +20,21 @@ from app.services.summary_service import (
 
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
+
+
+@router.post("/{meeting_id}/questions", response_model=QuestionAnswer)
+def ask_question(meeting_id: int, payload: QuestionRequest, db: Session = Depends(get_db)) -> QuestionAnswer:
+    meeting = get_meeting_or_404(db, meeting_id)
+    if not meeting.transcript or not meeting.transcript.strip():
+        raise HTTPException(status_code=409, detail="녹음 전사문이 없습니다. 먼저 음성 분석을 실행하세요.")
+    try:
+        return answer_question(meeting.transcript, payload.question)
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except APITimeoutError as exc:
+        raise HTTPException(status_code=504, detail="답변 생성 시간이 초과되었습니다. 잠시 후 다시 시도하세요.") from exc
+    except (OpenAIError, RuntimeError) as exc:
+        raise HTTPException(status_code=502, detail="AI 답변을 생성하지 못했습니다. API 키·모델·사용 한도를 확인하고 다시 시도하세요.") from exc
 
 
 @router.post("/upload", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)

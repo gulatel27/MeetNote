@@ -45,6 +45,14 @@ export async function getMeeting(meetingId) {
   return request(`/api/meetings/${meetingId}`);
 }
 
+export async function askMeetingQuestion(meetingId, question) {
+  return request(`/api/meetings/${meetingId}/questions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+}
+
 export async function getMeetings() {
   return request("/api/meetings");
 }

@@ -1,5 +1,22 @@
 # 회의 보고서 자동화 MVP
 
+## 녹음 내용 질문·답변
+
+음성 분석 후 결과 화면의 **녹음 내용에 질문하기**에 질문을 입력하고 **AI 답변 생성**을 누릅니다.
+예: “담당자와 마감일을 정리해줘”, “장애 원인은 무엇이라고 했어?”
+
+- 저장된 전체 전사문을 바탕으로 답변과 원문 근거를 생성합니다. 음성을 다시 전사하지 않습니다.
+- 녹음에 없는 내용은 확인할 수 없다고 답하며, 일부만 확인되면 부족한 근거를 표시합니다.
+- 각 질문은 독립적으로 분석합니다. 질문·답변은 화면 내에서만 유지되며 새로고침하면 사라집니다.
+- 전사문이 있으면 보고서 생성이 실패한 경우에도 질문할 수 있습니다.
+- 기존 `OPENAI_API_KEY`, `OPENAI_SUMMARY_MODEL` 설정을 사용합니다. 설정 변경 후 백엔드를 재시작하세요.
+- 질문마다 OpenAI API를 호출합니다. 답변 근거는 원문과 대조하지만 AI 답변의 정확성은 사용자가 확인해야 합니다.
+
+API: `POST /api/meetings/{meeting_id}/questions`, 본문: `{"question": "담당자는?"}`
+응답: `answer`, `evidence`(전사문 인용 배열), `insufficient_evidence`(근거 부족 여부).
+
+백엔드 검증: `cd backend` 후 `.venv\Scripts\python -m unittest discover -s tests -v`
+
 회의 음성파일을 업로드하면 FastAPI 백엔드가 파일을 로컬에 저장하고, OpenAI STT API로 transcript를 생성한 뒤 LLM으로 회의 요약 JSON과 Markdown 회의 보고서를 생성하는 MVP입니다. 처리 이력은 SQLite에 저장됩니다.
 
 ## 구현 범위

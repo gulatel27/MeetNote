@@ -1,7 +1,25 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class QuestionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("질문을 입력하세요.")
+        return value
+
+
+class QuestionAnswer(BaseModel):
+    answer: str
+    evidence: list[str]
+    insufficient_evidence: bool
 
 
 class UploadResponse(BaseModel):
